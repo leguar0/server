@@ -79,7 +79,7 @@ int main() {
     if (rc == SQLITE_OK)
     {
         std::cout << "CREATED TABLE" << std::endl;
-        const char* insert_data_sql = "INSERT INTO Items (name) VALUES ('SCWEL')";
+        const char* insert_data_sql = "INSERT INTO Items (name) VALUES ('TEST')";
 
         rc = sqlite3_exec(db, insert_data_sql, nullptr, nullptr, nullptr);
         if (rc == SQLITE_OK)
