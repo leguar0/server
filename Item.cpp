@@ -40,12 +40,12 @@ namespace item
 
 	enum RarityType 
 	{
-		COMMON = 1250,
-		UNCOMMON = 2500,
-		SET = 4000,
-		RARE = 5000,
-		LEGENDARY = 7500,
-		ANCIENT = 7500
+		COMMON,
+		UNCOMMON,
+		SET,
+		RARE,
+		LEGENDARY,
+		ANCIENT
 	};
 
 	enum ItemType
