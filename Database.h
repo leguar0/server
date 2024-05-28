@@ -22,7 +22,8 @@ public:
 	~Database();
 
 	sqlite3* getHandle() const;
-	void insertItem(item::Item item);
+	void insertItem(item::Item item, int req);
+	int insertRequirements(map<item::StatType, int> stats);
 };
 
 #endif 

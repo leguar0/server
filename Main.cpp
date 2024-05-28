@@ -4,6 +4,7 @@
 #include <boost/asio.hpp>
 #include <boost/beast.hpp>
 #include "Database.h"
+#include <cctype>
 
 using std::string;
 using tcp = boost::asio::ip::tcp;
@@ -31,9 +32,41 @@ string getItemType(item::ItemType type)
 {
     switch (type) 
     {
-    case item::ARMOUR: return "ARMOUR";
+    case item::HELMET: return "HELMET";
+    case item::NECKLACE: return "NECKLACE";
+    case item::GLOVES: return "GLOVES";
     case item::RING: return "RING";
+    case item::BRACERS: return "BRACERS";
+    case item::SHIELD: return "SHIELD";
+    case item::BOOTS: return "BOOTS";
+    case item::PANTS: return "PANTS";
+    case item::BELT: return "BELT";
+    case item::ARMOUR: return "ARMOUR";
+    case item::CAPE: return "CAPE";
     default: return "null";
+    }
+}
+
+string getStatType(item::StatType stat)
+{
+    switch (stat)
+    {
+    case item::STRENGTH: return "STRENGTH";
+    case item::DEXTERITY: return "DEXTERITY";
+    case item::POWER: return "POWER";
+    case item::KNOWLEDGE: return "KNOWLEDGE";
+    case item::HEALTH: return "HEALTH";
+    case item::MANA: return "MANA";
+    case item::STAMINA: return "STAMINA";
+    case item::SLASHING: return "SLASHING";
+    case item::CRUSHING: return "CRUSHING";
+    case item::PIERCING: return "PIERCING";
+    case item::COLD: return "COLD";
+    case item::FIRE: return "FIRE";
+    case item::ENERGY: return "ENERGY";
+    case item::MENTAL: return "MENTAL";
+    default:
+        break;
     }
 }
 
@@ -52,7 +85,7 @@ string getRarityType(item::RarityType rarity)
 }
 
 void handle_request(http::request<http::string_body>& request, tcp::socket& socket, Database* db) {
-    if (request.target() == "/items") {
+    if (request.target() == "/requirements") {
         http::response<http::string_body> response(http::status::ok, request.version());
         response.set(http::field::server, BOOST_BEAST_VERSION_STRING);
         response.set(http::field::content_type, "application/json");
@@ -61,7 +94,7 @@ void handle_request(http::request<http::string_body>& request, tcp::socket& sock
 
         std::string body = "[";
 
-        const char* select_data_sql = "SELECT * FROM Items";
+        const char* select_data_sql = "SELECT * FROM requirements";
         sqlite3_stmt* stmt;
         int rc = sqlite3_prepare_v2(db->getHandle(), select_data_sql, -1, &stmt, nullptr);
 
@@ -70,13 +103,10 @@ void handle_request(http::request<http::string_body>& request, tcp::socket& sock
         while ((rc = sqlite3_step(stmt)) == SQLITE_ROW)
         {
             int id = sqlite3_column_int(stmt, 0);
-            const unsigned char* name = sqlite3_column_text(stmt, 1);
-            int level = sqlite3_column_int(stmt, 2);
-            int type = sqlite3_column_int(stmt, 3);
-            int rank = sqlite3_column_int(stmt, 4);
-            int rarity = sqlite3_column_int(stmt, 5);
-
-            std::string name_str(reinterpret_cast<const char*>(name));
+            int req_strength = sqlite3_column_int(stmt, 1);
+            int req_dexterity = sqlite3_column_int(stmt, 2);
+            int req_power = sqlite3_column_int(stmt, 3);
+            int req_knowledge = sqlite3_column_int(stmt, 4);
 
             if (!first) {
                 body += ",";
@@ -87,11 +117,10 @@ void handle_request(http::request<http::string_body>& request, tcp::socket& sock
 
             body += "{";
             body += "\"id\":" + std::to_string(id) + ",";
-            body += "\"name\":\"" + name_str + "\",";
-            body += "\"level\":" + std::to_string(level) + ",";
-            body += "\"type\":\"" + getItemType(static_cast<item::ItemType>(type)) + "\",";
-            body += "\"rank\":\"" + getRankType(static_cast<item::RankType>(rank)) + "\",";
-            body += "\"rarity\":\"" + getRarityType(static_cast<item::RarityType>(rarity)) + "\"";
+            body += "\"req_strength\":" + std::to_string(req_strength) + ",";
+            body += "\"req_dexterity\":\"" + std::to_string(req_dexterity) + "\",";
+            body += "\"req_power\":\"" + std::to_string(req_power) + "\",";
+            body += "\"req_knowledge\":\"" + std::to_string(req_knowledge) + "\"";
             body += "}";
         }
 
@@ -104,7 +133,7 @@ void handle_request(http::request<http::string_body>& request, tcp::socket& sock
         http::write(socket, response);
     }
     else if (request.target() == "/item" && request.method() == http::verb::get) {
-        const char* select_data_sql = "SELECT * FROM Items";
+        const char* select_data_sql = "SELECT * FROM items";
         sqlite3_stmt* stmt;
         int rc = sqlite3_prepare_v2(db->getHandle(), select_data_sql, -1, &stmt, nullptr);
 
@@ -113,31 +142,85 @@ void handle_request(http::request<http::string_body>& request, tcp::socket& sock
         <html>
         <head>
             <title>Items</title>
+            <style>
+                body {
+                    background-color: black;
+                    line-height: 0.9;
+                    font-size: 12px;
+                }
+                p {
+                    color: #bab0a3;
+                }
+                .ancient {
+                    font-size: 16px;
+                    color: #dca779;
+                    font-weight: bold;
+                }
+                .rare {
+                    font-size: 16px;
+                    color: #42c8f5;
+                    font-weight: bold;
+                }
+                .legendary {
+                }
+            </style>
         </head>
         <body>
         )";
 
         while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
-            int id = sqlite3_column_int(stmt, 0);
+            item::Item item;
+            item.id = sqlite3_column_int(stmt, 0);
             const unsigned char* name = sqlite3_column_text(stmt, 1);
-            std::string name_str;
             if (name) {
-                name_str = reinterpret_cast<const char*>(name);
+                item.name = reinterpret_cast<const char*>(name);
             }
 
-            int level = sqlite3_column_int(stmt, 2);
-            int type = sqlite3_column_int(stmt, 3);
-            int rank = sqlite3_column_int(stmt, 4);
-            int rarity = sqlite3_column_int(stmt, 5);
+            item.level = sqlite3_column_int(stmt, 2);
+            item.type = static_cast<item::ItemType>(sqlite3_column_int(stmt, 3));
+            item.rank = static_cast<item::RankType>(sqlite3_column_int(stmt, 4));
+            item.rarity = static_cast<item::RarityType>(sqlite3_column_int(stmt, 5));
+
+            map<item::StatType, int> stats;
+            stats.emplace(item::STRENGTH,sqlite3_column_int(stmt, 6));
+            stats.emplace(item::DEXTERITY,sqlite3_column_int(stmt, 7));
+            stats.emplace(item::POWER,sqlite3_column_int(stmt, 8));
+            stats.emplace(item::KNOWLEDGE,sqlite3_column_int(stmt, 9));
+            stats.emplace(item::HEALTH,sqlite3_column_int(stmt, 10));
+            stats.emplace(item::MANA,sqlite3_column_int(stmt, 11));
+            stats.emplace(item::STAMINA,sqlite3_column_int(stmt, 12));
+            stats.emplace(item::SLASHING,sqlite3_column_int(stmt, 13));
+            stats.emplace(item::CRUSHING,sqlite3_column_int(stmt, 14));
+            stats.emplace(item::PIERCING,sqlite3_column_int(stmt, 15));
+            stats.emplace(item::FIRE,sqlite3_column_int(stmt, 16));
+            stats.emplace(item::COLD,sqlite3_column_int(stmt, 17));
+            stats.emplace(item::ENERGY,sqlite3_column_int(stmt, 18));
+            stats.emplace(item::MENTAL,sqlite3_column_int(stmt, 19));
+            item.stats = stats;
+
+            item::RarityType st = static_cast<item::RarityType>(item.rarity);
+            string str = getRarityType(st);
+            
+            for (int i = 0; i < str.length(); i++)
+            {
+                str[i] = std::tolower(str[i]);
+            }
 
             html_form += R"(
-            <p>)" + std::to_string(id) + R"(</p>
-            <p>)" + name_str + R"(</p>
-            <p>)" + std::to_string(level) + R"(</p>
-            <p>)" + std::to_string(type) + R"(</p>
-            <p>)" + std::to_string(rank) + R"(</p>
-            <p>)" + std::to_string(rarity) + R"(</p>
+            <p>)" + std::to_string(item.id) + R"(</p>
+            <p><span class=')" + str+ R"('>)" + item.name + R"(</span> [)" + getRankType(item.rank) + R"(]</p>
+            <p> Item level: )" + std::to_string(item.level) + R"(</p>
+            <p> Item type: )" + getItemType(static_cast<item::ItemType>(item.type)) + R"(</p>
             )";
+
+
+            for (const auto& stat : item.stats)
+            {
+                if (stat.second > 0)
+                {
+                    html_form += R"(<p>)" + getStatType(stat.first) + R"(: )" + std::to_string(item.stats[item::STRENGTH]) + R"(</p>)";
+                }
+            }
         }
 
         sqlite3_finalize(stmt);
@@ -168,6 +251,26 @@ void handle_request(http::request<http::string_body>& request, tcp::socket& sock
                     Type: <input type="number" name="type"><br>
                     Rank: <input type="number" name="rank"><br>
                     Rarity: <input type="number" name="rarity"><br>
+                    <h4>Requirements</h4>
+                    strength: <input type="number" name="req_strength"><br>
+                    dexterity: <input type="number" name="req_dexterity"><br>
+                    power: <input type="number" name="req_power"><br>
+                    knowledge: <input type="number" name="req_knowledge"><br>
+                    <h4>Stats</h4>
+                    strength: <input type="number" name="strength"><br>
+                    dexterity: <input type="number" name="dexterity"><br>
+                    power: <input type="number" name="power"><br>
+                    knowledge: <input type="number" name="knowledge"><br>
+                    health: <input type="number" name="health"><br>
+                    mana: <input type="number" name="mana"><br>
+                    stamina: <input type="number" name="stamina"><br>
+                    slashing: <input type="number" name="slashing"><br>
+                    crushing: <input type="number" name="crushing"><br>
+                    piercing: <input type="number" name="piercing"><br>
+                    fire: <input type="number" name="fire"><br>
+                    cold: <input type="number" name="cold"><br>
+                    energy: <input type="number" name="energy"><br>
+                    mental: <input type="number" name="mental"><br>
                     <input type="submit" value="Add Item">
                 </form>
             </body>
@@ -203,7 +306,32 @@ void handle_request(http::request<http::string_body>& request, tcp::socket& sock
         item.rank = static_cast<item::RankType>(std::stoi(form_data["rank"]));
         item.rarity = static_cast<item::RarityType>(std::stoi(form_data["rarity"]));
            
-        db->insertItem(item);
+        map<item::StatType, int> req;
+        req.emplace(item::StatType::STRENGTH, std::stoi(form_data["req_strength"]));
+        req.emplace(item::StatType::DEXTERITY, std::stoi(form_data["req_dexterity"]));
+        req.emplace(item::StatType::POWER, std::stoi(form_data["req_power"]));
+        req.emplace(item::StatType::KNOWLEDGE, std::stoi(form_data["req_knowledge"]));
+
+        map<item::StatType, int> stats;
+        stats.emplace(item::StatType::STRENGTH, std::stoi(form_data["strength"]));
+        stats.emplace(item::StatType::DEXTERITY, std::stoi(form_data["dexterity"]));
+        stats.emplace(item::StatType::POWER, std::stoi(form_data["power"]));
+        stats.emplace(item::StatType::KNOWLEDGE, std::stoi(form_data["knowledge"]));
+        stats.emplace(item::StatType::HEALTH, std::stoi(form_data["health"]));
+        stats.emplace(item::StatType::MANA, std::stoi(form_data["mana"]));
+        stats.emplace(item::StatType::STAMINA, std::stoi(form_data["stamina"]));
+        stats.emplace(item::StatType::SLASHING, std::stoi(form_data["slashing"]));
+        stats.emplace(item::StatType::CRUSHING, std::stoi(form_data["crushing"]));
+        stats.emplace(item::StatType::PIERCING, std::stoi(form_data["piercing"]));
+        stats.emplace(item::StatType::FIRE, std::stoi(form_data["fire"]));
+        stats.emplace(item::StatType::COLD, std::stoi(form_data["cold"]));
+        stats.emplace(item::StatType::ENERGY, std::stoi(form_data["energy"]));
+        stats.emplace(item::StatType::MENTAL, std::stoi(form_data["mental"]));
+        
+        item.stats = stats;
+
+        int id = db->insertRequirements(req);
+        db->insertItem(item, id);
         std::cout << "Item added" << std::endl;
 
         http::response<http::string_body> response(http::status::ok, request.version());
