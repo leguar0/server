@@ -43,6 +43,7 @@ string getItemType(item::ItemType type)
     case item::BELT: return "BELT";
     case item::ARMOUR: return "ARMOUR";
     case item::CAPE: return "CAPE";
+    case item::STAFF: return "STAFF";
     default: return "null";
     }
 }
@@ -146,7 +147,7 @@ void handle_request(http::request<http::string_body>& request, tcp::socket& sock
                 body {
                     background-color: black;
                     line-height: 0.9;
-                    font-size: 12px;
+                    font-size: 14px;
                 }
                 p {
                     color: #bab0a3;
@@ -162,6 +163,9 @@ void handle_request(http::request<http::string_body>& request, tcp::socket& sock
                     font-weight: bold;
                 }
                 .legendary {
+                    font-size: 16px;
+                    color: #fcba03;
+                    font-weight: bold;
                 }
             </style>
         </head>
@@ -170,7 +174,6 @@ void handle_request(http::request<http::string_body>& request, tcp::socket& sock
 
         while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
             item::Item item;
-            item.id = sqlite3_column_int(stmt, 0);
             const unsigned char* name = sqlite3_column_text(stmt, 1);
             if (name) {
                 item.name = reinterpret_cast<const char*>(name);
@@ -207,7 +210,6 @@ void handle_request(http::request<http::string_body>& request, tcp::socket& sock
             }
 
             html_form += R"(
-            <p>)" + std::to_string(item.id) + R"(</p>
             <p><span class=')" + str+ R"('>)" + item.name + R"(</span> [)" + getRankType(item.rank) + R"(]</p>
             <p> Item level: )" + std::to_string(item.level) + R"(</p>
             <p> Item type: )" + getItemType(static_cast<item::ItemType>(item.type)) + R"(</p>
@@ -218,7 +220,7 @@ void handle_request(http::request<http::string_body>& request, tcp::socket& sock
             {
                 if (stat.second > 0)
                 {
-                    html_form += R"(<p>)" + getStatType(stat.first) + R"(: )" + std::to_string(item.stats[item::STRENGTH]) + R"(</p>)";
+                    html_form += R"(<p>)" + getStatType(stat.first) + R"(: )" + std::to_string(item.stats[stat.first]) + R"(</p>)";
                 }
             }
         }
